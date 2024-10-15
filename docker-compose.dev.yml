@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: node:18-alpine
+    container_name: react-frontend-dev
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  backend:
+    image: maven:3.8.1-openjdk-17
+    container_name: spring-backend-dev
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - ~/.m2:/root/.m2
+    command: ["mvn", "spring-boot:run"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - app-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+
+  db:
+    image: postgres:14
+    container_name: postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: swkom-db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  app-network:
