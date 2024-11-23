@@ -1,13 +1,11 @@
 package org.example.backend.api;
 
-
+import lombok.RequiredArgsConstructor;
+import org.example.backend.service.DocumentService;
 import org.example.backend.service.dto.DocumentDTO;
 import org.example.backend.exception.DocumentException;
-import org.example.backend.service.DocumentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api")
 public class DocumentController {
@@ -31,14 +30,11 @@ public class DocumentController {
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
     private final DocumentService documentService;
 
-    @Autowired
-    public DocumentController(DocumentService documentService) {
-        this.documentService = documentService;
-    }
-
     @PostMapping("/upload")
     public ResponseEntity<DocumentDTO> uploadDocument(@RequestParam("file") MultipartFile file) {
+        logger.info("Received upload request for file: {}", file.getOriginalFilename());
         DocumentDTO documentDTO = documentService.uploadDocument(file);
+        logger.info("Successfully uploaded file: {}", file.getOriginalFilename());
         return new ResponseEntity<>(documentDTO, HttpStatus.CREATED);
     }
 
@@ -47,6 +43,12 @@ public class DocumentController {
         logger.info("Received request to list all documents.");
         List<DocumentDTO> documents = documentService.getAllDocuments();
         return new ResponseEntity<>(documents, HttpStatus.OK);
+    }
+
+    @GetMapping("/documents/{id}")
+    public ResponseEntity<DocumentDTO> getDocumentById(@PathVariable Long id) {
+        DocumentDTO document = documentService.getDocumentById(id);
+        return ResponseEntity.ok(document);
     }
 
     @GetMapping("/documents/download/{id}")
@@ -67,8 +69,7 @@ public class DocumentController {
             throw new DocumentException("File not found: " + documentDTO.getFileName(), ex);
         }
 
-        // Determine content type
-        String contentType = "application/octet-stream"; // Default
+        String contentType = "application/octet-stream";
         try {
             contentType = Files.probeContentType(filePath);
             if (contentType == null) {
@@ -96,7 +97,7 @@ public class DocumentController {
             return ResponseEntity.ok().body("Document deleted successfully.");
         } catch (DocumentException ex) {
             logger.error("Error deleting document with ID: {}", id, ex);
-            throw ex; // Will be handled by GlobalExceptionHandler
+            throw ex;
         }
     }
 }

@@ -21,8 +21,13 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
     depends_on:
       - db
+      - rabbitmq
     networks:
       - app-network
     ports:
@@ -39,6 +44,30 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-prod
+    ports:
+      - "5672:5672"
+      - "9093:15672"
+    networks:
+      - app-network
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    container_name: ocr-service-prod
+    depends_on:
+      - rabbitmq
+    networks:
+      - app-network
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
 
 networks:
   app-network:

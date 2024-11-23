@@ -1,19 +1,15 @@
-// src/main/java/org/example/backend/config/FileStorageProperties.java
 package org.example.backend.config;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+@Setter
+@Getter
 @Component
 @ConfigurationProperties(prefix = "file")
 public class FileStorageProperties {
     private String uploadDir;
 
-    public String getUploadDir() {
-        return uploadDir;
-    }
-
-    public void setUploadDir(String uploadDir) {
-        this.uploadDir = uploadDir;
-    }
 }

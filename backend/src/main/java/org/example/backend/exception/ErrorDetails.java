@@ -7,7 +7,6 @@ public class ErrorDetails {
     private String message;
     private String details;
 
-    // Constructors
     public ErrorDetails() {}
 
     public ErrorDetails(Date timestamp, String message, String details) {

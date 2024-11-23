@@ -8,6 +8,5 @@ import java.util.List;
 
 @Repository
 public interface DocumentRepository extends JpaRepository<DocumentEntity, Long> {
-
     List<DocumentEntity> findByTitleContainingIgnoreCase(String title);
 }

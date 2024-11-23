@@ -3,7 +3,10 @@ package org.example.backend.persistence.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
 @Entity
 @Table(name = "documents")
 public class DocumentEntity {
@@ -12,17 +15,24 @@ public class DocumentEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Setter
     @NotBlank(message = "Title must not be empty")
     @Size(max = 255, message = "Title must not exceed 255 characters")
     private String title;
 
+    @Setter
     @NotBlank(message = "File name must not be empty")
     @Size(max = 255, message = "File name must not exceed 255 characters")
     private String fileName;
 
+    @Setter
     @NotBlank(message = "File path must not be empty")
     @Size(max = 500, message = "File path must not exceed 500 characters")
     private String filePath;
+
+    @Setter
+    @Lob
+    private String textContent; // Getter added for textContent
 
     public DocumentEntity() {}
 
@@ -32,31 +42,4 @@ public class DocumentEntity {
         this.filePath = filePath;
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
-    }
-
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
 }

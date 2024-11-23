@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { FaDownload, FaTrash } from 'react-icons/fa';
-import {toast} from 'react-toastify';
+import { FaDownload, FaTrash, FaEye } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import Modal from 'react-modal';
 
 Modal.setAppElement('#root');
@@ -12,6 +12,9 @@ const Documents = () => {
     const [error, setError] = useState('');
     const [modalIsOpen, setModalIsOpen] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState(null);
+    const [selectedDocument, setSelectedDocument] = useState(null);
+    const [viewLoading, setViewLoading] = useState(false);
+    const [viewError, setViewError] = useState('');
 
     useEffect(() => {
         const fetchDocuments = async () => {
@@ -51,12 +54,12 @@ const Documents = () => {
         }
     };
 
-    const openModal = (id) => {
+    const openDeleteModal = (id) => {
         setDocumentToDelete(id);
         setModalIsOpen(true);
     };
 
-    const closeModal = () => {
+    const closeDeleteModal = () => {
         setDocumentToDelete(null);
         setModalIsOpen(false);
     };
@@ -72,8 +75,30 @@ const Documents = () => {
             console.error('Error deleting the file:', error);
             toast.error('Failed to delete the file. Please try again.');
         } finally {
-            closeModal();
+            closeDeleteModal();
         }
+    };
+
+    const openViewModal = async (id) => {
+        setViewLoading(true);
+        setViewError('');
+        try {
+            const response = await axios.get(`/api/documents/${id}`);
+            setSelectedDocument(response.data);
+            setModalIsOpen(true);
+            toast.success('Document details loaded successfully.');
+        } catch (err) {
+            console.error('Error fetching document details:', err);
+            setViewError('Failed to load document details. Please try again later.');
+            toast.error('Failed to load document details. Please try again later.');
+        } finally {
+            setViewLoading(false);
+        }
+    };
+
+    const closeViewModal = () => {
+        setSelectedDocument(null);
+        setModalIsOpen(false);
     };
 
     if (loading) {
@@ -123,7 +148,14 @@ const Documents = () => {
                                         <FaDownload size={20} />
                                     </button>
                                     <button
-                                        onClick={() => openModal(doc.id)}
+                                        onClick={() => openViewModal(doc.id)}
+                                        className="text-green-600 hover:text-green-800"
+                                        title="View Details"
+                                    >
+                                        <FaEye size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => openDeleteModal(doc.id)}
                                         className="text-red-600 hover:text-red-800"
                                         title="Delete"
                                     >
@@ -139,8 +171,8 @@ const Documents = () => {
 
             {/* Confirmation Modal for Deletion */}
             <Modal
-                isOpen={modalIsOpen}
-                onRequestClose={closeModal}
+                isOpen={modalIsOpen && documentToDelete === null && selectedDocument === null}
+                onRequestClose={closeDeleteModal}
                 contentLabel="Confirm Delete"
                 className="max-w-md mx-auto mt-40 bg-white p-6 rounded-md shadow-lg outline-none"
                 overlayClassName="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center"
@@ -149,7 +181,7 @@ const Documents = () => {
                 <p>Are you sure you want to delete this document?</p>
                 <div className="mt-6 flex justify-end space-x-4">
                     <button
-                        onClick={closeModal}
+                        onClick={closeDeleteModal}
                         className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
                     >
                         Cancel
@@ -161,6 +193,46 @@ const Documents = () => {
                         Delete
                     </button>
                 </div>
+            </Modal>
+
+            {/* Modal for Viewing Document Details */}
+            <Modal
+                isOpen={modalIsOpen && selectedDocument !== null}
+                onRequestClose={closeViewModal}
+                contentLabel="View Document Details"
+                className="max-w-3xl mx-auto mt-10 bg-white p-6 rounded-md shadow-lg outline-none overflow-y-auto max-h-full"
+                overlayClassName="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center"
+            >
+                {viewLoading ? (
+                    <div className="flex justify-center items-center h-full">
+                        <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
+                    </div>
+                ) : viewError ? (
+                    <div className="p-4 bg-red-100 rounded-md">
+                        <p className="text-red-600">{viewError}</p>
+                    </div>
+                ) : selectedDocument ? (
+                    <div>
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-medium">Title:</h3>
+                                <p>{selectedDocument.title}</p>
+                            </div>
+                            <div>
+                                <h3 className="font-medium">Text Content:</h3>
+                                <p className="whitespace-pre-wrap">{selectedDocument.textContent}</p>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={closeViewModal}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
             </Modal>
         </div>
     );

@@ -26,18 +26,22 @@ services:
       - ./backend:/app
       - ~/.m2:/root/.m2
       - ./backend/uploads:/app/uploads
-
     command: ["mvn", "spring-boot:run"]
     ports:
       - "8080:8080"
     depends_on:
       - db
+      - rabbitmq
     networks:
       - app-network
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
 
   db:
     image: postgres:14
@@ -53,6 +57,32 @@ services:
     networks:
       - app-network
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-dev
+    ports:
+      - "5672:5672"
+      - "9093:15672"
+    networks:
+      - app-network
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    container_name: ocr-service-dev
+    depends_on:
+      - rabbitmq
+    networks:
+      - app-network
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - TESSDATA_PREFIX=/app/tessdata
+    volumes:
+      - ./backend/uploads:/app/uploads
 volumes:
   postgres_data_dev:
 
