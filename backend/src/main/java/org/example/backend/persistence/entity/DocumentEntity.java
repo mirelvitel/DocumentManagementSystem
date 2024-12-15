@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
+@Setter
 @Entity
 @Table(name = "documents")
 public class DocumentEntity {
@@ -15,24 +16,20 @@ public class DocumentEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Setter
     @NotBlank(message = "Title must not be empty")
     @Size(max = 255, message = "Title must not exceed 255 characters")
     private String title;
 
-    @Setter
     @NotBlank(message = "File name must not be empty")
     @Size(max = 255, message = "File name must not exceed 255 characters")
     private String fileName;
 
-    @Setter
     @NotBlank(message = "File path must not be empty")
     @Size(max = 500, message = "File path must not exceed 500 characters")
     private String filePath;
 
-    @Setter
     @Lob
-    private String textContent; // Getter added for textContent
+    private String textContent;
 
     public DocumentEntity() {}
 
@@ -41,5 +38,4 @@ public class DocumentEntity {
         this.fileName = fileName;
         this.filePath = filePath;
     }
-
 }

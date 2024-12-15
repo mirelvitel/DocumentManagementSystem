@@ -25,9 +25,12 @@ services:
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
     depends_on:
       - db
       - rabbitmq
+      - elasticsearch
     networks:
       - app-network
     ports:
@@ -53,6 +56,23 @@ services:
       - "9093:15672"
     networks:
       - app-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.13
+    container_name: elasticsearch-prod
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - app-network
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
   ocr-service:
     build:

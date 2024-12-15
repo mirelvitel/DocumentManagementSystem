@@ -100,4 +100,17 @@ public class DocumentController {
             throw ex;
         }
     }
+
+    @GetMapping("/documents/search")
+    public ResponseEntity<List<DocumentDTO>> searchDocuments(@RequestParam String keyword) {
+        logger.info("Received search request for keyword: {}", keyword);
+        try {
+            List<DocumentDTO> searchResults = documentService.searchDocuments(keyword);
+            logger.info("Found {} documents matching keyword: {}", searchResults.size(), keyword);
+            return ResponseEntity.ok(searchResults);
+        } catch (Exception ex) {
+            logger.error("Error occurred while searching for documents with keyword: {}", keyword, ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

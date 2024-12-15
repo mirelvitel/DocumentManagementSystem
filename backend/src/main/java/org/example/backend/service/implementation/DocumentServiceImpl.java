@@ -3,13 +3,15 @@ package org.example.backend.service.implementation;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.config.FileStorageProperties;
 import org.example.backend.config.RabbitMQConfig;
+import org.example.backend.exception.DocumentException;
+import org.example.backend.persistence.elasticsearch.DocumentSearchEntity;
+import org.example.backend.persistence.elasticsearch.DocumentSearchRepository;
 import org.example.backend.persistence.entity.DocumentEntity;
+import org.example.backend.persistence.repository.DocumentRepository;
 import org.example.backend.service.DocumentService;
 import org.example.backend.service.dto.DocumentDTO;
-import org.example.backend.exception.DocumentException;
 import org.example.backend.service.dto.DocumentMessage;
 import org.example.backend.service.mapper.DocumentMapper;
-import org.example.backend.persistence.repository.DocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
@@ -30,6 +33,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final FileStorageProperties fileStorageProperties;
     private final DocumentMapper documentMapper;
     private final RabbitTemplate rabbitTemplate;
+    private final DocumentSearchRepository documentSearchRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentServiceImpl.class);
     private Path fileStorageLocation;
@@ -48,7 +52,6 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public DocumentDTO uploadDocument(MultipartFile file) {
-
         String fileName = storeFile(file);
         String filePath = this.fileStorageLocation.resolve(fileName).toString();
         String title = extractTitleFromFileName(fileName);
@@ -74,6 +77,7 @@ public class DocumentServiceImpl implements DocumentService {
         return documentMapper.toDTO(savedDocumentEntity);
     }
 
+    @Override
     public List<DocumentDTO> getAllDocuments() {
         List<DocumentEntity> documentEntities = documentRepository.findAll();
         return documentEntities.stream()
@@ -88,7 +92,7 @@ public class DocumentServiceImpl implements DocumentService {
         return documentMapper.toDTO(documentEntity);
     }
 
-
+    @Override
     public void deleteDocumentById(Long id) {
         DocumentEntity documentEntity = documentRepository.findById(id)
                 .orElseThrow(() -> new DocumentException("Document not found with id " + id));
@@ -102,6 +106,42 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         documentRepository.delete(documentEntity);
+    }
+
+    @Override
+    public void updateDocumentText(Long documentId, String extractedText) {
+        DocumentEntity documentEntity = documentRepository.findById(documentId)
+                .orElseThrow(() -> new DocumentException("Document not found with id " + documentId));
+
+        documentEntity.setTextContent(extractedText);
+        documentRepository.save(documentEntity);
+
+        // Map and index the updated document in Elasticsearch
+        try {
+            DocumentSearchEntity searchEntity = documentMapper.toSearchEntity(documentEntity);
+            documentSearchRepository.indexDocument(searchEntity);
+            logger.info("Indexed document with ID: {}", documentEntity.getId());
+        } catch (IOException e) {
+            logger.error("Failed to index document with ID: {}", documentEntity.getId(), e);
+            throw new DocumentException("Failed to index document with ID: " + documentEntity.getId(), e);
+        }
+    }
+
+    @Override
+    public List<DocumentDTO> searchDocuments(String keyword) {
+        try {
+            // Fetch search results as DocumentSearchEntity
+            List<DocumentSearchEntity> searchResults = documentSearchRepository.searchByContent(keyword);
+
+            // Map search results back to DTOs
+            return searchResults.stream()
+                    .map(documentMapper::toEntity)
+                    .map(documentMapper::toDTO)
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            logger.error("Error while searching documents in Elasticsearch", e);
+            throw new DocumentException("Error while searching documents", e);
+        }
     }
 
     private String storeFile(MultipartFile file) {
@@ -125,14 +165,4 @@ public class DocumentServiceImpl implements DocumentService {
         int dotIndex = fileName.lastIndexOf('.');
         return (dotIndex == -1) ? fileName : fileName.substring(0, dotIndex);
     }
-
-    @Override
-    public void updateDocumentText(Long documentId, String extractedText) {
-        DocumentEntity documentEntity = documentRepository.findById(documentId)
-                .orElseThrow(() -> new DocumentException("Document not found with id " + documentId));
-
-        documentEntity.setTextContent(extractedText);
-        documentRepository.save(documentEntity);
-    }
-
 }

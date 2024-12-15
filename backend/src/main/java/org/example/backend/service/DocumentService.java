@@ -11,4 +11,5 @@ public interface DocumentService {
     void deleteDocumentById(Long id);
     DocumentDTO getDocumentById(Long id);
     void updateDocumentText(Long documentId, String extractedText);
+    List<DocumentDTO> searchDocuments(String keyword);
 }
