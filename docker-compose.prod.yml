@@ -5,7 +5,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: react-frontend-prod
     ports:
       - "80:80"
     depends_on:
@@ -17,9 +16,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: spring-backend-prod
+    working_dir: /app
+    volumes:
+      - ~/.m2:/root/.m2
+      - ./backend/uploads:/app/uploads
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
+      - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
@@ -78,7 +81,6 @@ services:
     build:
       context: ./ocr-service
       dockerfile: Dockerfile
-    container_name: ocr-service-prod
     depends_on:
       - rabbitmq
     networks:
@@ -88,6 +90,8 @@ services:
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
+    volumes:
+      - ./backend/uploads:/app/uploads
 
 networks:
   app-network:
