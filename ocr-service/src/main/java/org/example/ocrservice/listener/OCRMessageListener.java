@@ -21,21 +21,31 @@ public class OCRMessageListener {
     private static final Logger logger = LoggerFactory.getLogger(OCRMessageListener.class);
 
     private final RabbitTemplate rabbitTemplate;
+    private final Tesseract tesseract; // Injected via constructor
 
     @RabbitListener(queues = RabbitMQConfig.DOCUMENT_UPLOAD_QUEUE)
     public void receiveMessage(DocumentMessage message) {
+        // Null check for the incoming message
+        if (message == null) {
+            logger.error("Received null DocumentMessage. Skipping processing.");
+            return;
+        }
+
         logger.info("Received message: {}", message);
 
         try {
-            File pdfFile = new File(message.getFilePath());
+            // Null and empty check for filePath
+            if (message.getFilePath() == null || message.getFilePath().trim().isEmpty()) {
+                logger.error("File path is null or empty for DocumentMessage: {}", message);
+                return;
+            }
 
+            File pdfFile = new File(message.getFilePath());
             if (!pdfFile.exists()) {
                 logger.error("File not found: {}", message.getFilePath());
                 return;
             }
 
-            Tesseract tesseract = new Tesseract();
-            tesseract.setLanguage("eng");
             String extractedText = tesseract.doOCR(pdfFile);
 
             OCRResultMessage resultMessage = new OCRResultMessage(

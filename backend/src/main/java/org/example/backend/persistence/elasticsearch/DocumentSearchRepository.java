@@ -1,12 +1,12 @@
 package org.example.backend.persistence.elasticsearch;
 
-import org.springframework.stereotype.Repository;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
 import co.elastic.clients.elasticsearch.core.IndexResponse;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
 import java.util.List;
