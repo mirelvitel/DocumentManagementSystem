@@ -17,7 +17,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
 
   backend:
-    image: maven:3.8.1-openjdk-17
+    image: maven:3.9-eclipse-temurin-17
     working_dir: /app
     volumes:
       - ./backend:/app

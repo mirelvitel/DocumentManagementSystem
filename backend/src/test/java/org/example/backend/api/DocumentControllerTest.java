@@ -2,8 +2,8 @@ package org.example.backend.api;
 
 import org.example.backend.exception.DocumentException;
 import org.example.backend.exception.GlobalExceptionHandler;
+import org.example.backend.service.DocumentService;
 import org.example.backend.service.dto.DocumentDTO;
-import org.example.backend.service.implementation.DocumentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DocumentControllerTest {
 
     @Mock
-    private DocumentServiceImpl documentService;
+    private DocumentService documentService;
 
     @InjectMocks
     private DocumentController documentController;

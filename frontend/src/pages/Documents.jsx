@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { FaDownload, FaTrash, FaEye } from 'react-icons/fa';
+import { FaDownload, FaTrash, FaEye, FaFilePdf, FaFileWord, FaFileImage, FaFile } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Modal from 'react-modal';
 
@@ -27,6 +27,59 @@ const modalStyles = {
     },
 };
 
+// Strip UUID prefix from stored filename for display
+const displayFileName = (fileName) => {
+    if (!fileName) return '';
+    // Stored as "uuid_originalname.ext" — strip the UUID prefix
+    const underscoreIndex = fileName.indexOf('_');
+    if (underscoreIndex > 0 && underscoreIndex < 40) {
+        return fileName.substring(underscoreIndex + 1);
+    }
+    return fileName;
+};
+
+const getFileIcon = (fileName) => {
+    if (!fileName) return <FaFile className="text-gray-400" />;
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (ext === 'pdf') return <FaFilePdf className="text-red-500" />;
+    if (['doc', 'docx'].includes(ext)) return <FaFileWord className="text-blue-500" />;
+    if (['jpg', 'jpeg', 'png', 'tiff', 'bmp'].includes(ext)) return <FaFileImage className="text-green-500" />;
+    return <FaFile className="text-gray-400" />;
+};
+
+const OcrBadge = ({ status }) => {
+    const styles = {
+        COMPLETED: 'bg-green-100 text-green-700',
+        PROCESSING: 'bg-yellow-100 text-yellow-700',
+        PENDING: 'bg-gray-100 text-gray-600',
+        FAILED: 'bg-red-100 text-red-700',
+    };
+    const labels = {
+        COMPLETED: 'OCR Done',
+        PROCESSING: 'Processing...',
+        PENDING: 'Pending',
+        FAILED: 'Failed',
+    };
+    const style = styles[status] || styles.PENDING;
+    const label = labels[status] || 'Unknown';
+
+    return (
+        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${style}`}>
+            {label}
+        </span>
+    );
+};
+
+const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+};
+
 const Documents = () => {
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -38,8 +91,8 @@ const Documents = () => {
     const [viewLoading, setViewLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchDocuments = async (query = '') => {
-        setLoading(true);
+    const fetchDocuments = async (query = '', silent = false) => {
+        if (!silent) setLoading(true);
         setError('');
         try {
             let response;
@@ -50,11 +103,13 @@ const Documents = () => {
             }
             setDocuments(response.data);
         } catch (err) {
-            console.error('Error fetching documents:', err);
-            setError('Failed to load documents. Please try again later.');
-            toast.error('Failed to load documents.');
+            if (!silent) {
+                console.error('Error fetching documents:', err);
+                setError('Failed to load documents. Please try again later.');
+                toast.error('Failed to load documents.');
+            }
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -62,8 +117,29 @@ const Documents = () => {
         fetchDocuments();
     }, []);
 
+    // Poll for OCR status updates when any document is still processing
+    useEffect(() => {
+        const hasProcessing = documents.some(
+            (doc) => doc.ocrStatus === 'PENDING' || doc.ocrStatus === 'PROCESSING'
+        );
+        if (!hasProcessing) return;
+
+        const interval = setInterval(() => {
+            fetchDocuments(searchQuery, true);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [documents, searchQuery]);
+
     const handleSearch = () => {
         fetchDocuments(searchQuery);
+    };
+
+    const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        if (value === '') {
+            fetchDocuments();
+        }
     };
 
     const handleSearchKeyDown = (e) => {
@@ -159,7 +235,7 @@ const Documents = () => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-md shadow-md">
+        <div className="max-w-5xl mx-auto mt-10 p-6 bg-white rounded-md shadow-md">
             <h2 className="text-2xl font-semibold mb-6">Documents</h2>
 
             <div className="mb-4 flex space-x-2">
@@ -167,7 +243,7 @@ const Documents = () => {
                     type="text"
                     placeholder="Search by content..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchChange}
                     onKeyDown={handleSearchKeyDown}
                     className="border px-4 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
@@ -196,25 +272,39 @@ const Documents = () => {
                     <table className="min-w-full bg-white">
                         <thead>
                         <tr className="bg-gray-50">
-                            <th className="py-3 px-4 border-b text-left font-medium text-gray-600">Title</th>
-                            <th className="py-3 px-4 border-b text-left font-medium text-gray-600">File Name</th>
+                            <th className="py-3 px-4 border-b text-left font-medium text-gray-600">Document</th>
+                            <th className="py-3 px-4 border-b text-left font-medium text-gray-600">Status</th>
+                            <th className="py-3 px-4 border-b text-left font-medium text-gray-600">Uploaded</th>
                             <th className="py-3 px-4 border-b text-center font-medium text-gray-600">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
                         {documents.map((doc) => (
                             <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="py-3 px-4 border-b">{doc.title}</td>
-                                <td className="py-3 px-4 border-b text-gray-600 text-sm">{doc.fileName}</td>
+                                <td className="py-3 px-4 border-b">
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-lg">{getFileIcon(doc.fileName)}</span>
+                                        <div>
+                                            <div className="font-medium">{doc.title}</div>
+                                            <div className="text-xs text-gray-400">{displayFileName(doc.fileName)}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="py-3 px-4 border-b">
+                                    <OcrBadge status={doc.ocrStatus} />
+                                </td>
+                                <td className="py-3 px-4 border-b text-sm text-gray-500">
+                                    {formatDate(doc.createdAt)}
+                                </td>
                                 <td className="py-3 px-4 border-b text-center space-x-3">
                                     <button onClick={() => handleDownload(doc.id, doc.fileName)} title="Download">
-                                        <FaDownload size={18} className="text-blue-600 hover:text-blue-800 inline" />
+                                        <FaDownload size={16} className="text-blue-600 hover:text-blue-800 inline" />
                                     </button>
                                     <button onClick={() => openViewModal(doc.id)} title="View Details">
-                                        <FaEye size={18} className="text-green-600 hover:text-green-800 inline" />
+                                        <FaEye size={16} className="text-green-600 hover:text-green-800 inline" />
                                     </button>
                                     <button onClick={() => openDeleteModal(doc.id)} title="Delete">
-                                        <FaTrash size={18} className="text-red-600 hover:text-red-800 inline" />
+                                        <FaTrash size={16} className="text-red-600 hover:text-red-800 inline" />
                                     </button>
                                 </td>
                             </tr>
@@ -247,18 +337,29 @@ const Documents = () => {
                     </div>
                 ) : selectedDocument ? (
                     <div className="space-y-3">
-                        <div>
-                            <span className="font-medium text-gray-700">Title:</span>
-                            <span className="ml-2">{selectedDocument.title}</span>
+                        <div className="flex items-center space-x-3">
+                            <span className="text-xl">{getFileIcon(selectedDocument.fileName)}</span>
+                            <div>
+                                <div className="font-medium text-lg">{selectedDocument.title}</div>
+                                <div className="text-sm text-gray-500">{displayFileName(selectedDocument.fileName)}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-3 text-sm">
+                            <OcrBadge status={selectedDocument.ocrStatus} />
+                            {selectedDocument.createdAt && (
+                                <span className="text-gray-400">Uploaded {formatDate(selectedDocument.createdAt)}</span>
+                            )}
                         </div>
                         <div>
-                            <span className="font-medium text-gray-700">File:</span>
-                            <span className="ml-2 text-sm text-gray-600">{selectedDocument.fileName}</span>
-                        </div>
-                        <div>
-                            <span className="font-medium text-gray-700">OCR Content:</span>
+                            <span className="font-medium text-gray-700">Extracted Text:</span>
                             <div className="mt-2 p-3 bg-gray-50 rounded text-sm max-h-64 overflow-auto whitespace-pre-wrap">
-                                {selectedDocument.textContent || 'No text extracted yet. OCR may still be processing.'}
+                                {selectedDocument.textContent || (
+                                    <span className="text-gray-400 italic">
+                                        {selectedDocument.ocrStatus === 'COMPLETED'
+                                            ? 'No text was extracted from this document.'
+                                            : 'OCR processing has not completed yet.'}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

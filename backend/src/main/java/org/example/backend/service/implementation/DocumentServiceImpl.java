@@ -58,6 +58,7 @@ public class DocumentServiceImpl implements DocumentService {
         String title = extractTitleFromFileName(file.getOriginalFilename());
 
         DocumentEntity documentEntity = new DocumentEntity(title, fileName, filePath);
+        documentEntity.setOcrStatus(DocumentEntity.OcrStatus.PENDING);
         DocumentEntity savedDocumentEntity = documentRepository.save(documentEntity);
 
         DocumentMessage message = new DocumentMessage(
@@ -69,8 +70,12 @@ public class DocumentServiceImpl implements DocumentService {
 
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.DOCUMENT_UPLOAD_QUEUE, message);
+            savedDocumentEntity.setOcrStatus(DocumentEntity.OcrStatus.PROCESSING);
+            documentRepository.save(savedDocumentEntity);
             logger.info("Sent message to RabbitMQ for document ID: {}", savedDocumentEntity.getId());
         } catch (Exception ex) {
+            savedDocumentEntity.setOcrStatus(DocumentEntity.OcrStatus.FAILED);
+            documentRepository.save(savedDocumentEntity);
             logger.error("Failed to send message to RabbitMQ for document ID: {}", savedDocumentEntity.getId(), ex);
             throw new DocumentException("Failed to queue document for OCR processing.", ex);
         }
@@ -105,12 +110,12 @@ public class DocumentServiceImpl implements DocumentService {
             logger.error("Could not delete file: {}", documentEntity.getFileName(), ex);
         }
 
-        // Remove from Elasticsearch index
+        // Remove from Elasticsearch index (best-effort — may not exist if OCR hasn't run)
         try {
             documentSearchRepository.deleteDocument(String.valueOf(id));
             logger.info("Removed document ID {} from Elasticsearch", id);
-        } catch (IOException ex) {
-            logger.error("Failed to remove document ID {} from Elasticsearch", id, ex);
+        } catch (Exception ex) {
+            logger.warn("Could not remove document ID {} from Elasticsearch (may not be indexed): {}", id, ex.getMessage());
         }
 
         documentRepository.delete(documentEntity);
@@ -122,6 +127,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .orElseThrow(() -> new DocumentException("Document not found with id " + documentId));
 
         documentEntity.setTextContent(extractedText);
+        documentEntity.setOcrStatus(DocumentEntity.OcrStatus.COMPLETED);
         documentRepository.save(documentEntity);
 
         try {

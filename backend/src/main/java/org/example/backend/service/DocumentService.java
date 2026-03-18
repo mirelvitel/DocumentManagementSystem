@@ -3,6 +3,7 @@ package org.example.backend.service;
 import org.example.backend.service.dto.DocumentDTO;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.List;
 
 public interface DocumentService {
@@ -12,4 +13,5 @@ public interface DocumentService {
     DocumentDTO getDocumentById(Long id);
     void updateDocumentText(Long documentId, String extractedText);
     List<DocumentDTO> searchDocuments(String keyword);
+    Path getDocumentFilePath(Long id);
 }

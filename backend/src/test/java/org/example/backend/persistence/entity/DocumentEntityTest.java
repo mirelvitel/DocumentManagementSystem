@@ -78,11 +78,19 @@ class DocumentEntityTest {
         entity.setFileName("test.pdf");
         entity.setFilePath("/uploads/test.pdf");
         entity.setTextContent("Extracted text");
+        entity.setOcrStatus(DocumentEntity.OcrStatus.COMPLETED);
 
         assertEquals(1L, entity.getId());
         assertEquals("Test", entity.getTitle());
         assertEquals("test.pdf", entity.getFileName());
         assertEquals("/uploads/test.pdf", entity.getFilePath());
         assertEquals("Extracted text", entity.getTextContent());
+        assertEquals(DocumentEntity.OcrStatus.COMPLETED, entity.getOcrStatus());
+    }
+
+    @Test
+    void ocrStatus_defaultsShouldWork() {
+        DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/path/file.pdf");
+        assertEquals(DocumentEntity.OcrStatus.PENDING, entity.getOcrStatus());
     }
 }

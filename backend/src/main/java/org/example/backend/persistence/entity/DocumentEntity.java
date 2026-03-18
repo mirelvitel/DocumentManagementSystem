@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @Entity
@@ -31,11 +33,32 @@ public class DocumentEntity {
     @Column(columnDefinition = "TEXT")
     private String textContent;
 
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @Enumerated(EnumType.STRING)
+    private OcrStatus ocrStatus = OcrStatus.PENDING;
+
     public DocumentEntity() {}
 
     public DocumentEntity(String title, String fileName, String filePath) {
         this.title = title;
         this.fileName = fileName;
         this.filePath = filePath;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        if (this.ocrStatus == null) {
+            this.ocrStatus = OcrStatus.PENDING;
+        }
+    }
+
+    public enum OcrStatus {
+        PENDING,
+        PROCESSING,
+        COMPLETED,
+        FAILED
     }
 }

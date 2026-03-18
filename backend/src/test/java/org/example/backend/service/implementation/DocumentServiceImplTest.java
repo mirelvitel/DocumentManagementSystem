@@ -78,8 +78,8 @@ class DocumentServiceImplTest {
         assertNotNull(result);
         assertEquals(1L, result.getId());
         assertEquals("test", result.getTitle());
-        verify(documentRepository).save(any(DocumentEntity.class));
-        verify(rabbitTemplate).convertAndSend(anyString(), any());
+        verify(documentRepository, atLeast(2)).save(any(DocumentEntity.class));
+        verify(rabbitTemplate).convertAndSend(anyString(), any(Object.class));
     }
 
     @Test

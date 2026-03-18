@@ -3,7 +3,6 @@ package org.example.backend.api;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.service.DocumentService;
 import org.example.backend.service.dto.DocumentDTO;
-import org.example.backend.service.implementation.DocumentServiceImpl;
 import org.example.backend.exception.DocumentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +27,7 @@ import java.util.List;
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
-    private final DocumentServiceImpl documentService;
+    private final DocumentService documentService;
 
     @PostMapping("/upload")
     public ResponseEntity<DocumentDTO> uploadDocument(@RequestParam("file") MultipartFile file) {

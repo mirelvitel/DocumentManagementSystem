@@ -2,6 +2,17 @@ import React from 'react';
 import { FaUpload, FaSearch, FaCloud } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
+const techStack = [
+    { name: 'Spring Boot', color: 'bg-green-100 text-green-700' },
+    { name: 'React', color: 'bg-blue-100 text-blue-700' },
+    { name: 'PostgreSQL', color: 'bg-indigo-100 text-indigo-700' },
+    { name: 'Elasticsearch', color: 'bg-yellow-100 text-yellow-700' },
+    { name: 'RabbitMQ', color: 'bg-orange-100 text-orange-700' },
+    { name: 'Tesseract OCR', color: 'bg-purple-100 text-purple-700' },
+    { name: 'Docker', color: 'bg-cyan-100 text-cyan-700' },
+    { name: 'Nginx', color: 'bg-emerald-100 text-emerald-700' },
+];
+
 const Home = () => {
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
@@ -13,16 +24,24 @@ const Home = () => {
                         <p className="text-lg text-blue-100 mb-8 max-w-2xl">
                             Upload documents, extract text with OCR, and search through your content instantly.
                         </p>
-                        <Link to="/upload">
-                            <button className="flex items-center bg-white text-blue-600 px-6 py-3 rounded-full font-semibold hover:bg-blue-50 transition duration-300">
-                                <FaUpload className="mr-2" />
-                                Upload Document
-                            </button>
-                        </Link>
+                        <div className="flex space-x-4">
+                            <Link to="/upload">
+                                <button className="flex items-center bg-white text-blue-600 px-6 py-3 rounded-full font-semibold hover:bg-blue-50 transition duration-300">
+                                    <FaUpload className="mr-2" />
+                                    Upload Document
+                                </button>
+                            </Link>
+                            <Link to="/documents">
+                                <button className="flex items-center border-2 border-white text-white px-6 py-3 rounded-full font-semibold hover:bg-white hover:text-blue-600 transition duration-300">
+                                    <FaSearch className="mr-2" />
+                                    Browse Documents
+                                </button>
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
-                {/* Features Section */}
+                {/* How It Works */}
                 <div className="p-8">
                     <h2 className="text-2xl font-semibold mb-6 text-center">How It Works</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -30,23 +49,38 @@ const Home = () => {
                             <FaUpload className="text-blue-500 text-3xl mb-4" />
                             <h3 className="text-lg font-semibold mb-2">1. Upload</h3>
                             <p className="text-center text-gray-600 text-sm">
-                                Upload PDF, DOC, or image files through the simple upload interface.
+                                Drag & drop PDF, DOC, or image files through the upload interface.
                             </p>
                         </div>
                         <div className="flex flex-col items-center bg-gray-50 p-6 rounded-lg">
                             <FaCloud className="text-blue-500 text-3xl mb-4" />
                             <h3 className="text-lg font-semibold mb-2">2. OCR Processing</h3>
                             <p className="text-center text-gray-600 text-sm">
-                                Tesseract OCR automatically extracts text from your documents.
+                                Documents are queued via RabbitMQ and processed by Tesseract OCR asynchronously.
                             </p>
                         </div>
                         <div className="flex flex-col items-center bg-gray-50 p-6 rounded-lg">
                             <FaSearch className="text-blue-500 text-3xl mb-4" />
                             <h3 className="text-lg font-semibold mb-2">3. Search</h3>
                             <p className="text-center text-gray-600 text-sm">
-                                Full-text search powered by Elasticsearch across all your documents.
+                                Full-text search powered by Elasticsearch across all extracted content.
                             </p>
                         </div>
+                    </div>
+                </div>
+
+                {/* Tech Stack */}
+                <div className="px-8 pb-8">
+                    <h2 className="text-2xl font-semibold mb-4 text-center">Built With</h2>
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {techStack.map((tech) => (
+                            <span
+                                key={tech.name}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium ${tech.color}`}
+                            >
+                                {tech.name}
+                            </span>
+                        ))}
                     </div>
                 </div>
             </div>

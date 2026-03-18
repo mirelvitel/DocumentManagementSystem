@@ -3,6 +3,8 @@ package org.example.backend.service.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Setter
 @Getter
 public class DocumentDTO {
@@ -11,6 +13,8 @@ public class DocumentDTO {
     private String title;
     private String fileName;
     private String textContent;
+    private LocalDateTime createdAt;
+    private String ocrStatus;
 
     public DocumentDTO() {}
 

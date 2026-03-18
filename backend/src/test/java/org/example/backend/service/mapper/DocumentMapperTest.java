@@ -13,10 +13,11 @@ class DocumentMapperTest {
     private final DocumentMapper mapper = Mappers.getMapper(DocumentMapper.class);
 
     @Test
-    void toDTO_shouldMapFieldsAndIgnoreFilePath() {
+    void toDTO_shouldMapFieldsIncludingOcrStatus() {
         DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/server/path/file.pdf");
         entity.setId(1L);
         entity.setTextContent("OCR text");
+        entity.setOcrStatus(DocumentEntity.OcrStatus.COMPLETED);
 
         DocumentDTO dto = mapper.toDTO(entity);
 
@@ -24,6 +25,7 @@ class DocumentMapperTest {
         assertEquals("Title", dto.getTitle());
         assertEquals("file.pdf", dto.getFileName());
         assertEquals("OCR text", dto.getTextContent());
+        assertEquals("COMPLETED", dto.getOcrStatus());
     }
 
     @Test
