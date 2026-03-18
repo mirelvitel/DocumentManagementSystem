@@ -1,0 +1,21 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+target/
+build/
+node_modules/
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment
+.env
+*.env.local

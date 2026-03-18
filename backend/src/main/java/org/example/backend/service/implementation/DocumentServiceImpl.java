@@ -23,6 +23,7 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -54,7 +55,7 @@ public class DocumentServiceImpl implements DocumentService {
     public DocumentDTO uploadDocument(MultipartFile file) {
         String fileName = storeFile(file);
         String filePath = this.fileStorageLocation.resolve(fileName).toString();
-        String title = extractTitleFromFileName(fileName);
+        String title = extractTitleFromFileName(file.getOriginalFilename());
 
         DocumentEntity documentEntity = new DocumentEntity(title, fileName, filePath);
         DocumentEntity savedDocumentEntity = documentRepository.save(documentEntity);
@@ -68,10 +69,10 @@ public class DocumentServiceImpl implements DocumentService {
 
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.DOCUMENT_UPLOAD_QUEUE, message);
-            logger.info("Sent message to RabbitMQ: {}", message);
+            logger.info("Sent message to RabbitMQ for document ID: {}", savedDocumentEntity.getId());
         } catch (Exception ex) {
             logger.error("Failed to send message to RabbitMQ for document ID: {}", savedDocumentEntity.getId(), ex);
-            throw new DocumentException("Failed to send message to RabbitMQ for document ID: " + savedDocumentEntity.getId(), ex);
+            throw new DocumentException("Failed to queue document for OCR processing.", ex);
         }
 
         return documentMapper.toDTO(savedDocumentEntity);
@@ -79,8 +80,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<DocumentDTO> getAllDocuments() {
-        List<DocumentEntity> documentEntities = documentRepository.findAll();
-        return documentEntities.stream()
+        return documentRepository.findAll().stream()
                 .map(documentMapper::toDTO)
                 .collect(Collectors.toList());
     }
@@ -97,12 +97,20 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentEntity documentEntity = documentRepository.findById(id)
                 .orElseThrow(() -> new DocumentException("Document not found with id " + id));
 
+        // Delete the file from disk
         Path filePath = Paths.get(documentEntity.getFilePath()).normalize();
-
         try {
             Files.deleteIfExists(filePath);
         } catch (IOException ex) {
-            throw new DocumentException("Could not delete file: " + documentEntity.getFileName(), ex);
+            logger.error("Could not delete file: {}", documentEntity.getFileName(), ex);
+        }
+
+        // Remove from Elasticsearch index
+        try {
+            documentSearchRepository.deleteDocument(String.valueOf(id));
+            logger.info("Removed document ID {} from Elasticsearch", id);
+        } catch (IOException ex) {
+            logger.error("Failed to remove document ID {} from Elasticsearch", id, ex);
         }
 
         documentRepository.delete(documentEntity);
@@ -116,7 +124,6 @@ public class DocumentServiceImpl implements DocumentService {
         documentEntity.setTextContent(extractedText);
         documentRepository.save(documentEntity);
 
-        // Map and index the updated document in Elasticsearch
         try {
             DocumentSearchEntity searchEntity = documentMapper.toSearchEntity(documentEntity);
             documentSearchRepository.indexDocument(searchEntity);
@@ -130,18 +137,23 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public List<DocumentDTO> searchDocuments(String keyword) {
         try {
-            // Fetch search results as DocumentSearchEntity
             List<DocumentSearchEntity> searchResults = documentSearchRepository.searchByContent(keyword);
-
-            // Map search results back to DTOs
             return searchResults.stream()
-                    .map(documentMapper::toEntity)
-                    .map(documentMapper::toDTO)
+                    .map(documentMapper::searchEntityToDTO)
                     .collect(Collectors.toList());
         } catch (IOException e) {
             logger.error("Error while searching documents in Elasticsearch", e);
             throw new DocumentException("Error while searching documents", e);
         }
+    }
+
+    /**
+     * Returns the file path for a document (used internally for downloads).
+     */
+    public Path getDocumentFilePath(Long id) {
+        DocumentEntity documentEntity = documentRepository.findById(id)
+                .orElseThrow(() -> new DocumentException("Document not found with id " + id));
+        return Paths.get(documentEntity.getFilePath()).normalize();
     }
 
     private String storeFile(MultipartFile file) {
@@ -151,10 +163,12 @@ public class DocumentServiceImpl implements DocumentService {
                 throw new DocumentException("Invalid path sequence in file name " + originalFileName);
             }
 
-            Path targetLocation = this.fileStorageLocation.resolve(originalFileName);
+            // Prefix with UUID to avoid name collisions
+            String storedFileName = UUID.randomUUID() + "_" + originalFileName;
+            Path targetLocation = this.fileStorageLocation.resolve(storedFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            return originalFileName;
+            return storedFileName;
         } catch (IOException ex) {
             throw new DocumentException("Could not store file " + originalFileName + ". Please try again!", ex);
         }

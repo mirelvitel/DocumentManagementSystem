@@ -3,79 +3,77 @@ package org.example.backend.service.mapper;
 import org.example.backend.persistence.elasticsearch.DocumentSearchEntity;
 import org.example.backend.persistence.entity.DocumentEntity;
 import org.example.backend.service.dto.DocumentDTO;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mapstruct.factory.Mappers;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class DocumentMapperTest {
 
-    @Mock
-    private DocumentMapper mapper;
+    private final DocumentMapper mapper = Mappers.getMapper(DocumentMapper.class);
 
-    @InjectMocks
-    private DocumentMapperTest documentMapperTest;
+    @Test
+    void toDTO_shouldMapFieldsAndIgnoreFilePath() {
+        DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/server/path/file.pdf");
+        entity.setId(1L);
+        entity.setTextContent("OCR text");
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+        DocumentDTO dto = mapper.toDTO(entity);
+
+        assertEquals(1L, dto.getId());
+        assertEquals("Title", dto.getTitle());
+        assertEquals("file.pdf", dto.getFileName());
+        assertEquals("OCR text", dto.getTextContent());
     }
 
     @Test
-    void testToDTO() {
-        // Arrange: Create a mock DocumentEntity and a mapped DocumentDTO
+    void toDTO_withNullTextContent_shouldMapCorrectly() {
+        DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/server/path/file.pdf");
+        entity.setId(2L);
+
+        DocumentDTO dto = mapper.toDTO(entity);
+
+        assertEquals(2L, dto.getId());
+        assertNull(dto.getTextContent());
+    }
+
+    @Test
+    void toSearchEntity_shouldMapAllFields() {
         DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/path/file.pdf");
         entity.setId(1L);
-        entity.setTextContent("Extracted content");
-        DocumentDTO expectedDto = new DocumentDTO(1L, "Title", "file.pdf", "/path/file.pdf", "Extracted content");
+        entity.setTextContent("OCR text");
 
-        when(mapper.toDTO(entity)).thenReturn(expectedDto);
+        DocumentSearchEntity searchEntity = mapper.toSearchEntity(entity);
 
-        // Act: Perform the mapping
-        DocumentDTO actualDto = mapper.toDTO(entity);
-
-        // Assert: Verify the mapped DTO matches the expected DTO
-        assertEquals(expectedDto, actualDto);
-        verify(mapper, times(1)).toDTO(entity);
+        assertEquals(1L, searchEntity.getId());
+        assertEquals("Title", searchEntity.getTitle());
+        assertEquals("file.pdf", searchEntity.getFileName());
+        assertEquals("/path/file.pdf", searchEntity.getFilePath());
+        assertEquals("OCR text", searchEntity.getTextContent());
     }
 
     @Test
-    void testToEntity() {
-        // Arrange: Create a mock DocumentDTO and a mapped DocumentEntity
-        DocumentDTO dto = new DocumentDTO(1L, "Title", "file.pdf", "/path/file.pdf", "Extracted content");
-        DocumentEntity expectedEntity = new DocumentEntity("Title", "file.pdf", "/path/file.pdf");
-        expectedEntity.setId(1L);
-        expectedEntity.setTextContent("Extracted content");
+    void searchEntityToDTO_shouldMapFieldsAndIgnoreFilePath() {
+        DocumentSearchEntity searchEntity = new DocumentSearchEntity(1L, "Title", "file.pdf", "/path/file.pdf", "OCR text");
 
-        when(mapper.toEntity(dto)).thenReturn(expectedEntity);
+        DocumentDTO dto = mapper.searchEntityToDTO(searchEntity);
 
-        // Act: Perform the mapping
-        DocumentEntity actualEntity = mapper.toEntity(dto);
-
-        // Assert: Verify the mapped Entity matches the expected Entity
-        assertEquals(expectedEntity, actualEntity);
-        verify(mapper, times(1)).toEntity(dto);
+        assertEquals(1L, dto.getId());
+        assertEquals("Title", dto.getTitle());
+        assertEquals("file.pdf", dto.getFileName());
+        assertEquals("OCR text", dto.getTextContent());
     }
 
     @Test
-    void testToSearchEntity() {
-        // Arrange: Create a mock DocumentEntity and a mapped DocumentSearchEntity
-        DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "/path/file.pdf");
-        entity.setId(1L);
-        entity.setTextContent("Extracted content");
-        DocumentSearchEntity expectedSearchEntity = new DocumentSearchEntity(1L, "Title", "file.pdf", "/path/file.pdf", "Extracted content");
+    void toEntity_fromSearchEntity_shouldMapAllFields() {
+        DocumentSearchEntity searchEntity = new DocumentSearchEntity(1L, "Title", "file.pdf", "/path/file.pdf", "OCR text");
 
-        when(mapper.toSearchEntity(entity)).thenReturn(expectedSearchEntity);
+        DocumentEntity entity = mapper.toEntity(searchEntity);
 
-        // Act: Perform the mapping
-        DocumentSearchEntity actualSearchEntity = mapper.toSearchEntity(entity);
-
-        // Assert: Verify the mapped SearchEntity matches the expected SearchEntity
-        assertEquals(expectedSearchEntity, actualSearchEntity);
-        verify(mapper, times(1)).toSearchEntity(entity);
+        assertEquals(1L, entity.getId());
+        assertEquals("Title", entity.getTitle());
+        assertEquals("file.pdf", entity.getFileName());
+        assertEquals("/path/file.pdf", entity.getFilePath());
+        assertEquals("OCR text", entity.getTextContent());
     }
 }

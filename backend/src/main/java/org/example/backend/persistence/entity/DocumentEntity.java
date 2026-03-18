@@ -28,7 +28,7 @@ public class DocumentEntity {
     @Size(max = 500, message = "File path must not exceed 500 characters")
     private String filePath;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String textContent;
 
     public DocumentEntity() {}

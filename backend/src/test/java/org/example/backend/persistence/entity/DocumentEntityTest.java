@@ -1,59 +1,88 @@
 package org.example.backend.persistence.entity;
 
 import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-import java.util.Collections;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class DocumentEntityTest {
 
-    @Mock
     private Validator validator;
-
-    @InjectMocks
-    private DocumentEntityTest documentEntityTest;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
     }
 
     @Test
-    void testValidDocumentEntity() {
-        // Arrange: Create a valid document entity and mock no violations
-        DocumentEntity entity = new DocumentEntity("Valid Title", "file.pdf", "/path/file.pdf");
-        when(validator.validate(entity)).thenReturn(Collections.emptySet());
-
-        // Act: Validate the entity
+    void validEntity_shouldHaveNoViolations() {
+        DocumentEntity entity = new DocumentEntity("My Document", "file.pdf", "/uploads/file.pdf");
         Set<ConstraintViolation<DocumentEntity>> violations = validator.validate(entity);
-
-        // Assert: Ensure no violations
         assertTrue(violations.isEmpty());
-        verify(validator, times(1)).validate(entity);
     }
 
     @Test
-    void testBlankTitle() {
-        // Arrange: Create a document entity with a blank title and mock a violation
-        DocumentEntity entity = new DocumentEntity("", "file.pdf", "/path/file.pdf");
-        ConstraintViolation<DocumentEntity> violation = mock(ConstraintViolation.class);
-        when(validator.validate(entity)).thenReturn(Set.of(violation));
-
-        // Act: Validate the entity
+    void blankTitle_shouldHaveViolation() {
+        DocumentEntity entity = new DocumentEntity("", "file.pdf", "/uploads/file.pdf");
         Set<ConstraintViolation<DocumentEntity>> violations = validator.validate(entity);
-
-        // Assert: Ensure one violation is present
         assertFalse(violations.isEmpty());
-        assertEquals(1, violations.size());
-        verify(validator, times(1)).validate(entity);
+        assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("title")));
+    }
+
+    @Test
+    void blankFileName_shouldHaveViolation() {
+        DocumentEntity entity = new DocumentEntity("Title", "", "/uploads/file.pdf");
+        Set<ConstraintViolation<DocumentEntity>> violations = validator.validate(entity);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("fileName")));
+    }
+
+    @Test
+    void blankFilePath_shouldHaveViolation() {
+        DocumentEntity entity = new DocumentEntity("Title", "file.pdf", "");
+        Set<ConstraintViolation<DocumentEntity>> violations = validator.validate(entity);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("filePath")));
+    }
+
+    @Test
+    void titleExceedingMaxLength_shouldHaveViolation() {
+        String longTitle = "a".repeat(256);
+        DocumentEntity entity = new DocumentEntity(longTitle, "file.pdf", "/uploads/file.pdf");
+        Set<ConstraintViolation<DocumentEntity>> violations = validator.validate(entity);
+        assertFalse(violations.isEmpty());
+    }
+
+    @Test
+    void defaultConstructor_shouldCreateEmptyEntity() {
+        DocumentEntity entity = new DocumentEntity();
+        assertNull(entity.getId());
+        assertNull(entity.getTitle());
+        assertNull(entity.getFileName());
+        assertNull(entity.getFilePath());
+        assertNull(entity.getTextContent());
+    }
+
+    @Test
+    void settersAndGetters_shouldWork() {
+        DocumentEntity entity = new DocumentEntity();
+        entity.setId(1L);
+        entity.setTitle("Test");
+        entity.setFileName("test.pdf");
+        entity.setFilePath("/uploads/test.pdf");
+        entity.setTextContent("Extracted text");
+
+        assertEquals(1L, entity.getId());
+        assertEquals("Test", entity.getTitle());
+        assertEquals("test.pdf", entity.getFileName());
+        assertEquals("/uploads/test.pdf", entity.getFilePath());
+        assertEquals("Extracted text", entity.getTextContent());
     }
 }

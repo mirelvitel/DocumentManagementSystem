@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const UploadDocuments = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [message, setMessage] = useState('');
+    const navigate = useNavigate();
 
     const handleFileChange = (event) => {
         setSelectedFile(event.target.files[0]);
-        setMessage('');
     };
 
     const handleUpload = async (event) => {
         event.preventDefault();
 
         if (!selectedFile) {
-            setMessage('Please select a file to upload.');
+            toast.warn('Please select a file to upload.');
             return;
         }
 
@@ -26,12 +27,9 @@ const UploadDocuments = () => {
         try {
             setUploading(true);
             setUploadProgress(0);
-            setMessage('');
 
             await axios.post('/api/upload', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
+                headers: { 'Content-Type': 'multipart/form-data' },
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round(
                         (progressEvent.loaded * 100) / progressEvent.total
@@ -40,11 +38,16 @@ const UploadDocuments = () => {
                 },
             });
 
-            setMessage('File uploaded successfully!');
+            toast.success('File uploaded successfully! OCR processing will begin shortly.');
             setSelectedFile(null);
+            // Reset the file input
+            document.getElementById('file').value = '';
+
+            // Navigate to documents after a short delay
+            setTimeout(() => navigate('/documents'), 1500);
         } catch (error) {
             console.error('Error uploading file:', error);
-            setMessage('Failed to upload file. Please try again.');
+            toast.error('Failed to upload file. Please try again.');
         } finally {
             setUploading(false);
             setUploadProgress(0);
@@ -53,7 +56,7 @@ const UploadDocuments = () => {
 
     return (
         <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-md shadow-md">
-            <h2 className="text-2xl font-semibold mb-4">Upload Documents</h2>
+            <h2 className="text-2xl font-semibold mb-4">Upload Document</h2>
             <form onSubmit={handleUpload}>
                 <div className="mb-4">
                     <label
@@ -66,30 +69,22 @@ const UploadDocuments = () => {
                         type="file"
                         id="file"
                         onChange={handleFileChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
-                        accept=".pdf,.doc,.docx,.jpg,.png"
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.tiff,.bmp"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Supported: PDF, DOC, DOCX, JPG, PNG, TIFF, BMP
+                    </p>
                 </div>
                 {uploading && (
                     <div className="mb-4">
                         <div className="w-full bg-gray-200 rounded-full h-2.5">
                             <div
-                                className="bg-blue-600 h-2.5 rounded-full"
+                                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                                 style={{ width: `${uploadProgress}%` }}
                             ></div>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">{uploadProgress}%</p>
-                    </div>
-                )}
-                {message && (
-                    <div
-                        className={`mb-4 text-sm ${
-                            message.includes('successfully')
-                                ? 'text-green-600'
-                                : 'text-red-600'
-                        }`}
-                    >
-                        {message}
                     </div>
                 )}
                 <button
