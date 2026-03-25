@@ -1,23 +1,22 @@
 package org.example.ocrservice.listener;
 
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
+import io.minio.MinioClient;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.example.ocrservice.config.RabbitMQConfig;
 import org.example.ocrservice.dto.DocumentMessage;
 import org.example.ocrservice.dto.OCRResultMessage;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.ByteArrayInputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -32,113 +31,79 @@ public class OCRMessageListenerTest {
     @Mock
     private Tesseract tesseract;
 
+    @Mock
+    private MinioClient minioClient;
+
     @InjectMocks
     private OCRMessageListener ocrMessageListener;
 
-    @TempDir
-    Path tempDir;
-
-    private File pdfFile;
-    private DocumentMessage documentMessage;
-
-    @BeforeEach
-    public void setUp() throws Exception {
-        // Create a temporary file to simulate a PDF
-        pdfFile = Files.createFile(tempDir.resolve("sample.pdf")).toFile();
-        documentMessage = new DocumentMessage(123L, "Test Title", "sample.pdf", pdfFile.getAbsolutePath());
-    }
-
     @Test
     public void testReceiveMessage_Success() throws Exception {
-        // Given
+        DocumentMessage message = new DocumentMessage(123L, "Test Title", "sample.pdf", "uuid_sample.pdf");
         String mockExtractedText = "This is some OCR text.";
-        when(tesseract.doOCR(pdfFile)).thenReturn(mockExtractedText);
 
-        // When
-        ocrMessageListener.receiveMessage(documentMessage);
+        GetObjectResponse mockResponse = mock(GetObjectResponse.class);
+        when(mockResponse.read(any(byte[].class))).thenAnswer(invocation -> {
+            byte[] buf = invocation.getArgument(0);
+            byte[] content = "fake pdf content".getBytes();
+            System.arraycopy(content, 0, buf, 0, content.length);
+            return content.length;
+        }).thenReturn(-1);
+        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(mockResponse);
+        when(tesseract.doOCR(any(java.io.File.class))).thenReturn(mockExtractedText);
 
-        // Then
+        ocrMessageListener.receiveMessage(message);
+
         ArgumentCaptor<OCRResultMessage> resultCaptor = ArgumentCaptor.forClass(OCRResultMessage.class);
         verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.OCR_RESULT_QUEUE), resultCaptor.capture());
 
         OCRResultMessage result = resultCaptor.getValue();
-        assertNotNull(result, "OCRResultMessage should not be null");
-        assertEquals(documentMessage.getDocumentId(), result.getDocumentId(), "Document IDs should match");
-        assertEquals(mockExtractedText, result.getExtractedText(), "Extracted text should match the mock");
+        assertNotNull(result);
+        assertEquals(123L, result.getDocumentId());
+        assertEquals(mockExtractedText, result.getExtractedText());
     }
 
     @Test
-    public void testReceiveMessage_FileNotFound() {
-        // Given a non-existent file path
-        DocumentMessage nonExistentMessage = new DocumentMessage(124L, "NonExistent", "no_file.pdf", "non_existent.pdf");
+    public void testReceiveMessage_NullMessage() {
+        ocrMessageListener.receiveMessage(null);
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
+    }
 
-        // When
-        ocrMessageListener.receiveMessage(nonExistentMessage);
+    @Test
+    public void testReceiveMessage_EmptyFilePath() {
+        DocumentMessage message = new DocumentMessage(125L, "Empty Path", "empty.pdf", "");
+        ocrMessageListener.receiveMessage(message);
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
+    }
 
-        // Then
+    @Test
+    public void testReceiveMessage_NullFilePath() {
+        DocumentMessage message = new DocumentMessage(126L, "Null Path", "null.pdf", null);
+        ocrMessageListener.receiveMessage(message);
+        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
+    }
+
+    @Test
+    public void testReceiveMessage_MinIOError() throws Exception {
+        DocumentMessage message = new DocumentMessage(127L, "Error", "error.pdf", "uuid_error.pdf");
+        when(minioClient.getObject(any(GetObjectArgs.class))).thenThrow(new RuntimeException("MinIO connection failed"));
+
+        ocrMessageListener.receiveMessage(message);
+
         verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
     }
 
     @Test
     public void testReceiveMessage_TesseractException() throws Exception {
-        // Given a Tesseract exception
-        when(tesseract.doOCR(pdfFile)).thenThrow(new TesseractException("OCR Error"));
+        DocumentMessage message = new DocumentMessage(128L, "OCR Fail", "fail.pdf", "uuid_fail.pdf");
 
-        // When
-        ocrMessageListener.receiveMessage(documentMessage);
+        GetObjectResponse mockResponse = mock(GetObjectResponse.class);
+        when(mockResponse.read(any(byte[].class))).thenReturn(-1);
+        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(mockResponse);
+        when(tesseract.doOCR(any(java.io.File.class))).thenThrow(new TesseractException("OCR Error"));
 
-        // Then
+        ocrMessageListener.receiveMessage(message);
+
         verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
-    }
-
-    @Test
-    public void testReceiveMessage_NullMessage() {
-        // When
-        ocrMessageListener.receiveMessage(null);
-
-        // Then
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
-        // Optionally, verify that an error was logged about the null message
-    }
-
-    @Test
-    public void testReceiveMessage_EmptyFilePath() {
-        // Given a DocumentMessage with an empty file path
-        DocumentMessage emptyPathMessage = new DocumentMessage(125L, "Empty Path", "empty.pdf", "");
-
-        // When
-        ocrMessageListener.receiveMessage(emptyPathMessage);
-
-        // Then
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
-        // Optionally, verify that an error was logged about the empty file path
-    }
-
-    @Test
-    public void testReceiveMessage_RabbitTemplateException() throws Exception {
-        // Given
-        String mockExtractedText = "This is some OCR text.";
-        when(tesseract.doOCR(pdfFile)).thenReturn(mockExtractedText);
-        doThrow(new RuntimeException("RabbitMQ Error")).when(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.OCR_RESULT_QUEUE), any(OCRResultMessage.class));
-
-        // When
-        ocrMessageListener.receiveMessage(documentMessage);
-
-        // Then
-        verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.OCR_RESULT_QUEUE), any(OCRResultMessage.class));
-        // Optionally, verify that an error was logged about the RabbitMQ failure
-    }
-
-    @Test
-    public void testReceiveMessage_MalformedMessage() {
-        // Given a DocumentMessage with missing file path
-        DocumentMessage malformedMessage = new DocumentMessage(126L, "Malformed", "malformed.pdf", null);
-
-        // When
-        ocrMessageListener.receiveMessage(malformedMessage);
-
-        // Then
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), any(OCRResultMessage.class));
-        // Optionally, verify that an error was logged about the malformed message
     }
 }

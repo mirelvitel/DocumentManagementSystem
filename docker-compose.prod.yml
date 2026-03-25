@@ -15,8 +15,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    volumes:
-      - uploads_data:/app/uploads
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
       - SPRING_DATASOURCE_USERNAME=postgres
@@ -28,12 +26,18 @@ services:
       - ELASTICSEARCH_HOST=elasticsearch
       - ELASTICSEARCH_PORT=9200
       - ELASTICSEARCH_PROTOCOL=http
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=documents
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - app-network
@@ -82,12 +86,30 @@ services:
       timeout: 5s
       retries: 15
 
+  minio:
+    image: minio/minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   ocr-service:
     build:
       context: ./ocr-service
       dockerfile: Dockerfile
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - app-network
@@ -97,12 +119,14 @@ services:
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
       - TESSDATA_PREFIX=/app/tessdata/
-    volumes:
-      - uploads_data:/app/uploads
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=documents
 
 networks:
   app-network:
 
 volumes:
   postgres_data:
-  uploads_data:
+  minio_data:
