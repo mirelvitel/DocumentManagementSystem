@@ -1,18 +1,15 @@
 package org.example.backend.service.implementation;
 
-import org.example.backend.config.FileStorageProperties;
 import org.example.backend.exception.DocumentException;
 import org.example.backend.persistence.elasticsearch.DocumentSearchEntity;
 import org.example.backend.persistence.elasticsearch.DocumentSearchRepository;
 import org.example.backend.persistence.entity.DocumentEntity;
 import org.example.backend.persistence.repository.DocumentRepository;
+import org.example.backend.service.MinIOService;
 import org.example.backend.service.dto.DocumentDTO;
 import org.example.backend.service.mapper.DocumentMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,7 +18,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,9 +33,6 @@ class DocumentServiceImplTest {
     private DocumentRepository documentRepository;
 
     @Mock
-    private FileStorageProperties fileStorageProperties;
-
-    @Mock
     private DocumentMapper documentMapper;
 
     @Mock
@@ -48,25 +41,19 @@ class DocumentServiceImplTest {
     @Mock
     private DocumentSearchRepository documentSearchRepository;
 
+    @Mock
+    private MinIOService minIOService;
+
     @InjectMocks
     private DocumentServiceImpl documentService;
-
-    @TempDir
-    Path tempDir;
-
-    @BeforeEach
-    void setUp() {
-        when(fileStorageProperties.getUploadDir()).thenReturn(tempDir.toString());
-        documentService.init();
-    }
 
     @Test
     void uploadDocument_shouldSaveAndSendMessage() throws IOException {
         MultipartFile file = mock(MultipartFile.class);
         when(file.getOriginalFilename()).thenReturn("test.pdf");
-        when(file.getInputStream()).thenReturn(new ByteArrayInputStream("content".getBytes()));
+        when(minIOService.uploadFile(file)).thenReturn("uuid_test.pdf");
 
-        DocumentEntity savedEntity = new DocumentEntity("test", "test.pdf", tempDir + "/test.pdf");
+        DocumentEntity savedEntity = new DocumentEntity("test", "test.pdf", "uuid_test.pdf");
         savedEntity.setId(1L);
         when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
 
@@ -80,13 +67,14 @@ class DocumentServiceImplTest {
         assertEquals("test", result.getTitle());
         verify(documentRepository, atLeast(2)).save(any(DocumentEntity.class));
         verify(rabbitTemplate).convertAndSend(anyString(), any(Object.class));
+        verify(minIOService).uploadFile(file);
     }
 
     @Test
     void getAllDocuments_shouldReturnMappedDTOs() {
-        DocumentEntity entity1 = new DocumentEntity("Doc1", "doc1.pdf", "/path/doc1.pdf");
+        DocumentEntity entity1 = new DocumentEntity("Doc1", "doc1.pdf", "key1");
         entity1.setId(1L);
-        DocumentEntity entity2 = new DocumentEntity("Doc2", "doc2.pdf", "/path/doc2.pdf");
+        DocumentEntity entity2 = new DocumentEntity("Doc2", "doc2.pdf", "key2");
         entity2.setId(2L);
 
         when(documentRepository.findAll()).thenReturn(List.of(entity1, entity2));
@@ -101,7 +89,7 @@ class DocumentServiceImplTest {
 
     @Test
     void getDocumentById_existingId_shouldReturnDTO() {
-        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", "/path/test.pdf");
+        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", "key1");
         entity.setId(1L);
         when(documentRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(documentMapper.toDTO(entity)).thenReturn(new DocumentDTO(1L, "Test", "test.pdf", null));
@@ -120,13 +108,14 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void deleteDocumentById_shouldDeleteFromDbAndElasticsearch() throws IOException {
-        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", tempDir + "/test.pdf");
+    void deleteDocumentById_shouldDeleteFromMinIODbAndElasticsearch() throws IOException {
+        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", "uuid_test.pdf");
         entity.setId(1L);
         when(documentRepository.findById(1L)).thenReturn(Optional.of(entity));
 
         documentService.deleteDocumentById(1L);
 
+        verify(minIOService).deleteFile("uuid_test.pdf");
         verify(documentRepository).delete(entity);
         verify(documentSearchRepository).deleteDocument("1");
     }
@@ -140,7 +129,7 @@ class DocumentServiceImplTest {
 
     @Test
     void updateDocumentText_shouldSaveAndIndex() throws IOException {
-        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", "/path/test.pdf");
+        DocumentEntity entity = new DocumentEntity("Test", "test.pdf", "key1");
         entity.setId(1L);
         when(documentRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(documentRepository.save(entity)).thenReturn(entity);
@@ -166,7 +155,7 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void uploadDocument_withPathTraversal_shouldThrow() throws IOException {
+    void uploadDocument_withPathTraversal_shouldThrow() {
         MultipartFile file = mock(MultipartFile.class);
         when(file.getOriginalFilename()).thenReturn("../etc/passwd");
 

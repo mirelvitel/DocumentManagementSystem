@@ -3,11 +3,10 @@ package org.example.backend.api;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.service.DocumentService;
 import org.example.backend.service.dto.DocumentDTO;
-import org.example.backend.exception.DocumentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,10 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Path;
-import java.net.MalformedURLException;
-import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -52,30 +48,12 @@ public class DocumentController {
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long id) {
         logger.info("Download request for document ID: {}", id);
         DocumentDTO documentDTO = documentService.getDocumentById(id);
-        Path filePath = documentService.getDocumentFilePath(id);
+        InputStream inputStream = documentService.getDocumentFile(id);
 
-        Resource resource;
-        try {
-            resource = new UrlResource(filePath.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new DocumentException("File not found or not readable: " + documentDTO.getFileName());
-            }
-        } catch (MalformedURLException ex) {
-            throw new DocumentException("File not found: " + documentDTO.getFileName(), ex);
-        }
-
-        String contentType = "application/octet-stream";
-        try {
-            String detectedType = Files.probeContentType(filePath);
-            if (detectedType != null) {
-                contentType = detectedType;
-            }
-        } catch (IOException ex) {
-            logger.warn("Could not determine file type for: {}", documentDTO.getFileName());
-        }
+        InputStreamResource resource = new InputStreamResource(inputStream);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + documentDTO.getFileName() + "\"")
                 .body(resource);
     }
