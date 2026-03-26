@@ -19,4 +19,4 @@ COPY --from=build /app/target/*.jar /app/ocr-service.jar
 
 ENV TESSDATA_PREFIX=/app/tessdata/
 
-ENTRYPOINT ["java", "-jar", "/app/ocr-service.jar"]
+ENTRYPOINT ["java", "-Djava.net.preferIPv6Addresses=true", "-jar", "/app/ocr-service.jar"]
