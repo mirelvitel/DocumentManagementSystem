@@ -40,8 +40,7 @@ public class MinIOConfig {
                 logger.info("Created MinIO bucket: {}", bucket);
             }
         } catch (Exception e) {
-            logger.error("Failed to initialize MinIO bucket: {}", bucket, e);
-            throw new RuntimeException("MinIO bucket initialization failed", e);
+            logger.warn("Failed to initialize MinIO bucket '{}' at startup. Will retry on first use. Error: {}", bucket, e.getMessage());
         }
 
         return client;

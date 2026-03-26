@@ -127,7 +127,14 @@ public class DocumentServiceImpl implements DocumentService {
         try {
             List<DocumentSearchEntity> searchResults = documentSearchRepository.searchByContent(keyword);
             return searchResults.stream()
-                    .map(documentMapper::searchEntityToDTO)
+                    .map(searchEntity -> {
+                        DocumentDTO dto = documentMapper.searchEntityToDTO(searchEntity);
+                        documentRepository.findById(searchEntity.getId()).ifPresent(entity -> {
+                                dto.setOcrStatus(entity.getOcrStatus() != null ? entity.getOcrStatus().name() : null);
+                                dto.setCreatedAt(entity.getCreatedAt());
+                        });
+                        return dto;
+                    })
                     .collect(Collectors.toList());
         } catch (IOException e) {
             logger.error("Error while searching documents in Elasticsearch", e);
