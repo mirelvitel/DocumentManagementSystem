@@ -3,6 +3,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    ports:
+      - "3001:80"
     depends_on:
       backend:
         condition: service_started
@@ -14,7 +16,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-        - "8090:8090"
+      - "8001:8080"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/swkom-db
       - SPRING_DATASOURCE_USERNAME=postgres
