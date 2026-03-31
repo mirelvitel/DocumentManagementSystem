@@ -9,5 +9,5 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar /app/backend.jar
-EXPOSE 8080
+EXPOSE 8090
 CMD ["java", "-Djava.net.preferIPv6Addresses=true", "-jar", "/app/backend.jar"]
